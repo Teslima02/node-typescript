@@ -1,12 +1,22 @@
 import "dotenv/config";
-import * as mongoose from "mongoose";
+import "reflect-metadata";
+import { createConnection } from "typeorm";
 import App from "./app";
+import config from "./ormconfig";
 import validateEnv from "./utils/validateEnv";
 import PostsController from "./posts/posts.controller";
-import AuthenticationController from "./authentication/authentication.controller";
+// import AuthenticationController from "./authentication/authentication.controller";
 
 validateEnv();
 
-const app = new App([new PostsController(), new AuthenticationController()]);
+(async () => {
+  try {
+    await createConnection(config);
+  } catch (error) {
+    console.log("Error while connecting to the database", error);
+    return error;
+  }
+  const app = new App([new PostsController()]);
 
-app.listen();
+  app.listen();
+})();

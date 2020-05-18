@@ -1,14 +1,16 @@
 import * as express from "express";
+import { getRepository } from "typeorm";
 import PostNotFoundException from "../exceptions/PostNotFoundException";
 import Controller from "../interfaces/controller.interface";
 import validationMiddleware from "../middleware/validation.middleware";
 import CreatePostDto from "./posts.dto";
 import Post from "./posts.interface";
-import postModel from "./posts.model";
+import postModel from "./post.entity";
 
 class PostsController implements Controller {
   public path = "/posts";
   public router = express.Router();
+  private postRepository = getRepository(postModel);
   private post = postModel;
 
   constructor() {
@@ -31,71 +33,66 @@ class PostsController implements Controller {
     );
   }
 
-  private getAllPosts = (
+  private createPost = async (
     request: express.Request,
     response: express.Response
   ) => {
-    this.post.find().then((posts) => {
-      response.send(posts);
-    });
+    const postData: CreatePostDto = request.body;
+    const newPost = this.postRepository.create(postData);
+    await this.postRepository.save(newPost);
+    response.send(newPost);
   };
 
-  private getPostById = (
+  private getAllPosts = async (
+    request: express.Request,
+    response: express.Response
+  ) => {
+    const posts = await this.postRepository.find();
+    response.send(posts);
+  };
+
+  private getPostById = async (
     request: express.Request,
     response: express.Response,
     next: express.NextFunction
   ) => {
     const id = request.params.id;
-    this.post.findById(id).then((post) => {
-      if (post) {
-        response.send(post);
-      } else {
-        next(new PostNotFoundException(id));
-      }
-    });
+    const post = await this.postRepository.findOne(id);
+    if (post) {
+      response.send(post);
+    } else {
+      next(new PostNotFoundException(id));
+    }
   };
 
-  private modifyPost = (
+  private modifyPost = async (
     request: express.Request,
     response: express.Response,
     next: express.NextFunction
   ) => {
     const id = request.params.id;
     const postData: Post = request.body;
-    this.post.findByIdAndUpdate(id, postData, { new: true }).then((post) => {
-      if (post) {
-        response.send(post);
-      } else {
-        next(new PostNotFoundException(id));
-      }
-    });
+    await this.postRepository.update(id, postData);
+    const updatedPost = await this.postRepository.findOne(id);
+    if (updatedPost) {
+      response.send(updatedPost);
+    } else {
+      next(new PostNotFoundException(id));
+    }
   };
 
-  private createPost = (
-    request: express.Request,
-    response: express.Response
-  ) => {
-    console.log(request.body);
-    const postData: Post = request.body;
-    const createdPost = new this.post(postData);
-    createdPost.save().then((savedPost) => {
-      response.send(savedPost);
-    });
-  };
-
-  private deletePost = (
+  private deletePost = async (
     request: express.Request,
     response: express.Response,
     next: express.NextFunction
   ) => {
     const id = request.params.id;
-    this.post.findByIdAndDelete(id).then((successResponse) => {
-      if (successResponse) {
-        response.send(200);
-      } else {
-        next(new PostNotFoundException(id));
-      }
-    });
+    const deleteResponse = await this.postRepository.delete(id);
+    if (deleteResponse.raw[1]) {
+      response.sendStatus(200);
+    } else {
+      next(new PostNotFoundException(id));
+    }
   };
 }
 
